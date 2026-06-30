@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { sendInquiryEmails } from "@/lib/email";
 import { parseDateOnly } from "@/lib/dates";
 
 export type InquiryState = { error?: string } | undefined;
@@ -38,6 +39,21 @@ export async function createInquiryAction(
       status: "new",
     },
   });
+
+  // Kvittering til gjest + varsel til admin. Skal aldri bryte flyten.
+  try {
+    let apartmentTitle: string | undefined;
+    if (apartmentId) {
+      const apt = await prisma.apartment.findUnique({
+        where: { id: apartmentId },
+        select: { title: true },
+      });
+      apartmentTitle = apt?.title;
+    }
+    await sendInquiryEmails(inquiry, apartmentTitle);
+  } catch (mailErr) {
+    console.error("E-postvarsling (forespørsel) feilet:", mailErr);
+  }
 
   redirect(`/foresporsel/takk?id=${inquiry.id}`);
 }

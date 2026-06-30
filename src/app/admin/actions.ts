@@ -7,6 +7,7 @@ import { checkPassword, startSession, endSession } from "@/lib/auth";
 import { parseDateOnly } from "@/lib/dates";
 import { syncAll } from "@/lib/sync";
 import { closeDatesOnChannels } from "@/lib/channels";
+import { sendBookingStatusEmail } from "@/lib/email";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -133,9 +134,19 @@ export async function toggleApartmentActiveAction(formData: FormData) {
 export async function setBookingStatusAction(formData: FormData) {
   const id = str(formData, "id");
   const status = str(formData, "status");
-  const booking = await prisma.booking.update({ where: { id }, data: { status } });
+  const booking = await prisma.booking.update({
+    where: { id },
+    data: { status },
+    include: { apartment: true },
+  });
   if (status === "confirmed") {
     await closeDatesOnChannels(booking.apartmentId, booking.checkIn, booking.checkOut);
+  }
+  // Statusmail til gjest. Skal aldri bryte flyten.
+  try {
+    await sendBookingStatusEmail(booking, booking.apartment, status);
+  } catch (mailErr) {
+    console.error("E-postvarsling (status) feilet:", mailErr);
   }
   revalidatePath("/admin/bookinger");
 }

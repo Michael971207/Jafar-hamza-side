@@ -104,9 +104,32 @@ Disse er **arkitektonisk klare**, men trenger eksterne kontoer/nøkler du styrer
 - **Online betaling (Vipps/Stripe)** – i dag bekreftes booking med faktura/
   bankoverføring (kontonr vises). Betalingssteget er isolert slik at Vipps/Stripe
   kan legges på uten å røre booking-logikken.
-- **E-postvarsling** – booking/forespørsel lagres i databasen; koble på en
-  e-posttjeneste (Resend/Postmark) for automatiske varsler.
+- **E-postvarsling** – ✅ implementert (se under). Trenger kun en Resend-konto
+  + verifisert domene for å gå live.
 - **Loyalty-program** – bevisst utsatt (lav prioritet).
+
+---
+
+## E-postvarsling
+
+Automatiske varsler sendes ved (`src/lib/email.ts`):
+
+| Hendelse | Til gjest | Til admin |
+|---|---|---|
+| Ny booking | Bekreftelse + betalingsinfo | Varsel med gjestedetaljer |
+| Booking bekreftet (admin) | "Bekreftet" + betalingsinfo | — |
+| Booking avlyst (admin) | "Avlyst" | — |
+| Ny forespørsel (midt/langtid) | Kvittering | Varsel med ønsker |
+
+Bruker **Resend** sitt HTTP-API direkte (ingen ekstra npm-pakke). **Uten
+`RESEND_API_KEY` logges e-postene til konsollen i stedet for å sendes** – så
+booking-/forespørselsflyten brytes aldri, og du kan teste alt før e-post er satt
+opp. Sending er pakket i `try/catch`: en e-postfeil stopper aldri en booking.
+
+**Sett opp (når du er klar):**
+1. Opprett gratis konto på [resend.com](https://resend.com) og verifiser domenet ditt.
+2. Sett i miljøet: `RESEND_API_KEY`, `EMAIL_FROM` (avsender på verifisert domene),
+   `ADMIN_EMAIL` (hvor Jafar får varsler). Se `.env.example`.
 
 ---
 

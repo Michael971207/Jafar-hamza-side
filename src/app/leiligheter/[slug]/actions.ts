@@ -8,6 +8,7 @@ import {
   BookingValidationError,
 } from "@/lib/booking";
 import { closeDatesOnChannels } from "@/lib/channels";
+import { sendBookingReceivedEmails } from "@/lib/email";
 import { parseDateOnly } from "@/lib/dates";
 
 export type BookingFormState = { error?: string } | undefined;
@@ -50,6 +51,14 @@ export async function createBookingAction(
 
     // Steng datoene på øvrige kanaler umiddelbart (Beds24 hvis konfigurert).
     await closeDatesOnChannels(apartmentId, booking.checkIn, booking.checkOut);
+
+    // Send bekreftelse til gjest + varsel til admin. Skal aldri bryte flyten.
+    try {
+      const apartment = await prisma.apartment.findUnique({ where: { id: apartmentId } });
+      if (apartment) await sendBookingReceivedEmails(booking, apartment);
+    } catch (mailErr) {
+      console.error("E-postvarsling (booking) feilet:", mailErr);
+    }
   } catch (err) {
     if (err instanceof BookingConflictError) {
       return { error: "Beklager – datoene ble nettopp booket. Velg en annen periode." };
