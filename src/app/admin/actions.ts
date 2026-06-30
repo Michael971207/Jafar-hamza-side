@@ -8,6 +8,7 @@ import { parseDateOnly } from "@/lib/dates";
 import { syncAll } from "@/lib/sync";
 import { closeDatesOnChannels } from "@/lib/channels";
 import { sendBookingStatusEmail, sendNewMessageEmail } from "@/lib/email";
+import { markBookingPaid } from "@/lib/payments";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,19 @@ export async function setBookingStatusAction(formData: FormData) {
     console.error("E-postvarsling (status) feilet:", mailErr);
   }
   revalidatePath("/admin/bookinger");
+}
+
+/** Marker en booking som betalt manuelt (f.eks. mottatt bankoverføring). */
+export async function markBookingPaidManualAction(formData: FormData) {
+  const id = str(formData, "id");
+  const booking = await prisma.booking.findUnique({ where: { id }, select: { totalPrice: true, paymentStatus: true } });
+  if (!booking || booking.paymentStatus === "paid") return;
+  await prisma.payment.create({
+    data: { bookingId: id, provider: "manual", amount: booking.totalPrice, currency: "NOK", status: "paid" },
+  });
+  await markBookingPaid(id, { provider: "manual" });
+  revalidatePath("/admin/bookinger");
+  revalidatePath(`/admin/bookinger/${id}`);
 }
 
 /** Utleier sender en chat-melding til gjesten. */

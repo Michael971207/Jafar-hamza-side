@@ -99,13 +99,40 @@ model Booking {
   // Når gjesten meldte innsjekk (null = ikke meldt ennå).
   checkinRequestedAt DateTime?
 
+  // unpaid | paid | refunded
+  paymentStatus String @default("unpaid")
+  paidAt        DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   messages Message[]
+  payments Payment[]
 
   @@index([apartmentId, checkIn, checkOut])
   @@index([status])
+}
+
+/// En betalingstransaksjon for en booking (Stripe/Vipps/manuell).
+model Payment {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  // stripe | vipps | manual
+  provider String
+  amount   Int      // NOK (hele kroner)
+  currency String   @default("NOK")
+  // created | pending | paid | failed | refunded
+  status      String  @default("created")
+  // Stripe Checkout session-id / Vipps ordre-id
+  providerRef String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([providerRef])
 }
 
 /// Melding i samtalen mellom gjest og utleier, knyttet til en booking.

@@ -52,12 +52,13 @@ export default async function AdminBookings() {
               <th className="px-4 py-3">Kilde</th>
               <th className="px-4 py-3">Sum</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Betaling</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-ink/5">
             {bookings.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-ink-muted">Ingen bookinger ennå.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-6 text-center text-ink-muted">Ingen bookinger ennå.</td></tr>
             )}
             {bookings.map((b) => (
               <tr key={b.id}>
@@ -87,6 +88,15 @@ export default async function AdminBookings() {
                   }>
                     {STATUS_LABEL[b.status] ?? b.status}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {b.paymentStatus === "paid" ? (
+                    <span className="text-brand font-medium">Betalt</span>
+                  ) : b.paymentStatus === "refunded" ? (
+                    <span className="text-ink-muted">Refundert</span>
+                  ) : (
+                    <span className="text-ink-muted">Ubetalt</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">

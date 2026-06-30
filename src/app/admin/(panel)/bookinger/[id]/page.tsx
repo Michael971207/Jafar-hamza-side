@@ -4,7 +4,11 @@ import { prisma } from "@/lib/db";
 import { siteUrl } from "@/lib/business";
 import { formatNok, formatDateNo, formatDateTimeNo } from "@/lib/format";
 import { Chat, type ChatMessage } from "@/components/Chat";
-import { sendHostMessageAction, setBookingStatusAction } from "@/app/admin/actions";
+import {
+  sendHostMessageAction,
+  setBookingStatusAction,
+  markBookingPaidManualAction,
+} from "@/app/admin/actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin – booking" };
@@ -72,6 +76,25 @@ export default async function AdminBookingDetail({ params }: { params: { id: str
               <dt className="text-ink-muted">Telefon</dt>
               <dd className="text-right font-medium">{booking.phone || "—"}</dd>
             </dl>
+          </div>
+
+          <div className="card p-6">
+            <h2 className="font-display text-lg font-semibold">Betaling</h2>
+            <p className="mt-2 text-sm">
+              {booking.paymentStatus === "paid" ? (
+                <span className="font-medium text-brand">
+                  ✓ Betalt{booking.paidAt ? ` ${formatDateNo(booking.paidAt)}` : ""}
+                </span>
+              ) : (
+                <span className="text-ink-muted">Ubetalt ({formatNok(booking.totalPrice)})</span>
+              )}
+            </p>
+            {booking.paymentStatus !== "paid" && booking.status !== "cancelled" && (
+              <form action={markBookingPaidManualAction} className="mt-3">
+                <input type="hidden" name="id" value={booking.id} />
+                <button className="btn-ghost">Marker som betalt (bankoverføring)</button>
+              </form>
+            )}
           </div>
 
           <div className="card p-6">
