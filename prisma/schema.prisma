@@ -1,0 +1,205 @@
+// Jafar Utleie – datamodell.
+// SQLite for MVP. For produksjon: bytt provider til "postgresql" og sett DATABASE_URL.
+// SQLite har én skriver om gangen, så "sjekk-så-skriv" inne i en transaksjon er
+// nok til å garantere at to bookinger aldri kan overlappe (se src/lib/booking.ts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// En utleieenhet. Kan være korttid, midt/langtid eller begge.
+model Apartment {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  shortDesc   String  @default("")
+  description String  @default("")
+
+  // Adresse / plassering
+  address String @default("")
+  city    String @default("Haugesund")
+  area    String @default("") // f.eks. "Sentrum", "Utenfor byen"
+  lat     Float?
+  lng     Float?
+
+  // Egenskaper
+  bedrooms  Int     @default(1)
+  bathrooms Int     @default(1)
+  maxGuests Int     @default(2)
+  sizeM2    Int?
+
+  // Pris (NOK). Korttid per natt, midt/langtid per måned.
+  nightlyPrice Int     @default(0)
+  monthlyPrice Int?
+  cleaningFee  Int     @default(0)
+
+  // JSON-strenger (SQLite har ikke native array/json)
+  images    String @default("[]") // JSON: string[] med bilde-URLer
+  amenities String @default("[]") // JSON: string[] med amenity-nøkler (se src/lib/amenities.ts)
+
+  // Utleietype som tilbys
+  allowShortTerm Boolean @default(true)
+  allowLongTerm  Boolean @default(true)
+
+  // Minimum/maksimum netter for korttidsbooking
+  minNights Int @default(1)
+  maxNights Int @default(90)
+
+  active    Boolean @default(true)
+  featured  Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings        Booking[]
+  calendarBlocks  CalendarBlock[]
+  channels        ChannelConnection[]
+  priceReferences PriceReference[]
+  viewings        Viewing[]
+}
+
+/// En bekreftet/avventende booking gjort via den nye siden eller importert.
+model Booking {
+  id          String   @id @default(cuid())
+  apartmentId String
+  apartment   Apartment @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+
+  guestName  String
+  email      String
+  phone      String   @default("")
+  guests     Int      @default(1)
+  message    String   @default("")
+
+  // Datoer er lagret som midnatt UTC. checkOut er eksklusiv (utsjekk-dag).
+  checkIn  DateTime
+  checkOut DateTime
+
+  nights     Int
+  totalPrice Int @default(0)
+
+  // pending | confirmed | cancelled
+  status String @default("pending")
+  // direct | airbnb | booking | beds24 | manual
+  source String @default("direct")
+  // Referanse i ekstern kanal (f.eks. Airbnb reservasjons-ID)
+  channelRef String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([apartmentId, checkIn, checkOut])
+  @@index([status])
+}
+
+/// Blokkering av datoer som IKKE er en booking hos oss:
+/// importerte opptatt-perioder fra Airbnb/Booking (iCal), eller manuell sperring.
+model CalendarBlock {
+  id          String   @id @default(cuid())
+  apartmentId String
+  apartment   Apartment @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+
+  start DateTime
+  end   DateTime // eksklusiv
+
+  // airbnb | booking | beds24 | manual
+  source String @default("manual")
+  reason String @default("")
+  // For idempotent iCal-import: ekstern UID fra .ics-fila
+  externalUid String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([apartmentId, source, externalUid])
+  @@index([apartmentId, start, end])
+}
+
+/// Forespørsel om leie (særlig midt-/langtid) der leietaker beskriver ønsket.
+model Inquiry {
+  id          String   @id @default(cuid())
+  apartmentId String?  // valgfritt: knyttet til en konkret leilighet
+
+  name    String
+  email   String
+  phone   String @default("")
+
+  // Ønsket
+  area           String  @default("") // f.eks. "utenfor byen"
+  bedrooms       Int     @default(1)
+  guests         Int     @default(1)
+  startDate      DateTime?
+  durationMonths Int?
+  maxBudget      Int?
+  message        String  @default("")
+
+  // new | contacted | matched | closed
+  status String @default("new")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// Visningsinformasjon for (nye) leiligheter.
+model Viewing {
+  id          String   @id @default(cuid())
+  apartmentId String?
+  apartment   Apartment? @relation(fields: [apartmentId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String   @default("")
+  address     String   @default("")
+  startsAt    DateTime
+  endsAt      DateTime?
+  published   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([startsAt])
+}
+
+/// Synk-kobling pr. leilighet pr. kanal (iCal/Beds24).
+model ChannelConnection {
+  id          String   @id @default(cuid())
+  apartmentId String
+  apartment   Apartment @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+
+  // airbnb | booking | beds24
+  channel String
+
+  // iCal: URL vi importerer opptatt-datoer fra
+  icalImportUrl String?
+  // Beds24: rom-ID i Beds24
+  beds24RoomId  String?
+
+  active    Boolean  @default(true)
+  lastSync  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([apartmentId, channel])
+}
+
+/// Referansepris hentet manuelt fra Airbnb/Booking for å beregne hvor mye
+/// billigere direkte-booking kan være (etter plattform-gebyr).
+model PriceReference {
+  id          String   @id @default(cuid())
+  apartmentId String
+  apartment   Apartment @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+
+  // airbnb | booking
+  channel String
+  // Pris gjesten ser på kanalen (per natt, NOK)
+  guestPrice Int
+  // Gebyr-prosent kanalen tar (f.eks. 15 for Airbnb host-fee + service)
+  feePercent Float @default(0)
+  note       String @default("")
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([apartmentId, channel])
+}
