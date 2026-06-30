@@ -174,6 +174,10 @@ selve nettsiden anbefales **Vercel** (enklest for Next.js + Prisma). En
      Legg til `?pgbouncer=true&connection_limit=1` på slutten.
    - Kopier **Session / Direct connection** (port `5432`) → dette blir `DIRECT_URL`.
    - Bytt ut `[YOUR-PASSWORD]` med databasepassordet i begge.
+   - **Viktig:** har passordet spesialtegn (`@ # ? / : & %` osv.) må de
+     prosent-kodes (`@`→`%40`, `#`→`%23`, …), ellers får du feilen *"invalid
+     domain character in database URL"*. Enklest er å sette et passord uten
+     spesialtegn (Settings → Database → Reset database password).
 3. Opprett tabellene. Lokalt, med de to URLene i `.env`:
    ```bash
    npm run db:push     # oppretter alle tabeller i Supabase
@@ -229,6 +233,24 @@ raskest mulig live-gang. Si fra om du vil at jeg setter opp Cloudflare-varianten
 fullt ut.
 
 ---
+
+## Feilsøking
+
+**`invalid domain character in database URL` / `Invalid prisma...invocation`**
+Databasepassordet i `DATABASE_URL`/`DIRECT_URL` har et spesialtegn som ikke er
+prosent-kodet. Kod tegnene (`@`→`%40`, `#`→`%23`, `?`→`%3F`, `/`→`%2F`,
+`:`→`%3A`, `&`→`%26`, `%`→`%25`), eller sett et passord uten spesialtegn i
+Supabase. Begge URLene må oppdateres.
+
+**`Can't reach database server`** – sjekk at du bruker riktige porter
+(app = 6543 pooled, `db push` = 5432 direct) og at prosjektet ikke er pauset i
+Supabase (gratis-prosjekter pauses ved inaktivitet – åpne dashbordet for å vekke det).
+
+**Sjekke at alt bygger lokalt før deploy:**
+```bash
+npx tsc --noEmit     # streng TypeScript-sjekk (skal gi 0 feil)
+npm run build        # full produksjonsbuild
+```
 
 ## Prosjektstruktur
 
