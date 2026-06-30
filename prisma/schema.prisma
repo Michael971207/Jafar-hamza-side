@@ -1,15 +1,19 @@
 // Jafar Utleie – datamodell.
-// SQLite for MVP. For produksjon: bytt provider til "postgresql" og sett DATABASE_URL.
-// SQLite har én skriver om gangen, så "sjekk-så-skriv" inne i en transaksjon er
-// nok til å garantere at to bookinger aldri kan overlappe (se src/lib/booking.ts).
+// Database: PostgreSQL (Supabase). Anti-dobbeltbooking er sikret med en
+// Postgres advisory-lås per leilighet i booking-transaksjonen (se
+// src/lib/booking.ts), slik at to overlappende bookinger aldri kan opprettes.
+//
+// DATABASE_URL = pooled connection (Supabase, port 6543, ?pgbouncer=true) – brukes av appen.
+// DIRECT_URL   = direct connection (Supabase, port 5432) – brukes av prisma migrate/db push.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 /// En utleieenhet. Kan være korttid, midt/langtid eller begge.

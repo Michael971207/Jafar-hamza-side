@@ -15,10 +15,16 @@ export function generateAccessToken(): string {
 // hvis den dekkes av enten en aktiv booking (pending/confirmed) ELLER en
 // CalendarBlock (importert fra Airbnb/Booking via iCal/Beds24, eller manuell).
 //
-// Opprettelse av booking skjer i en transaksjon som FØRST sjekker overlapp og
-// DERETTER skriver. SQLite serialiserer skrivere, så to samtidige forsøk kan
-// aldri begge passere sjekken. Bytt til Postgres → bruk Serializable isolation.
+// Opprettelse av booking skjer i en transaksjon som FØRST tar en Postgres
+// advisory-lås på leiligheten, så SJEKKER overlapp, og DERETTER skriver. Låsen
+// gjør at to samtidige forsøk på samme leilighet kjøres etter hverandre – aldri
+// kan begge passere sjekken. Ulike leiligheter blokkerer ikke hverandre.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** True hvis vi kjører mot PostgreSQL (Supabase). */
+function usingPostgres(): boolean {
+  return (process.env.DATABASE_URL ?? "").includes("postgres");
+}
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -118,6 +124,16 @@ export async function createBooking(input: CreateBookingInput) {
   }
 
   return prisma.$transaction(async (tx) => {
+    // Serialiser bookinger per leilighet: kun én transaksjon for samme leilighet
+    // kan holde låsen om gangen, så "sjekk-så-skriv" under er alltid trygt.
+    // Låsen frigjøres automatisk når transaksjonen committes/rulles tilbake.
+    if (usingPostgres()) {
+      await tx.$executeRawUnsafe(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        input.apartmentId,
+      );
+    }
+
     const apartment = await tx.apartment.findUnique({
       where: { id: input.apartmentId },
     });
