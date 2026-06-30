@@ -5,11 +5,23 @@
 // å sendes – slik at booking-/forespørselsflyten aldri brytes i utvikling eller
 // før e-post er satt opp.
 
-import { business } from "@/lib/business";
+import { business, siteUrl } from "@/lib/business";
 import { formatNok, formatDateNo } from "@/lib/format";
 import type { Apartment, Booking, Inquiry } from "@prisma/client";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
+
+function guestBookingUrl(token: string | null): string | null {
+  return token ? `${siteUrl()}/min-booking/${token}` : null;
+}
+
+function adminBookingUrl(id: string): string {
+  return `${siteUrl()}/admin/bookinger/${id}`;
+}
+
+function button(href: string, label: string): string {
+  return `<a href="${href}" style="display:inline-block;margin-top:16px;background:#0f5e57;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:999px;font-weight:600;font-size:14px;">${label}</a>`;
+}
 
 function fromAddress(): string {
   // F.eks. "Jafar Utleie <booking@dittdomene.no>"
@@ -130,7 +142,12 @@ export async function sendBookingReceivedEmails(booking: Booking, apartment: Apa
         snart som mulig. Her er detaljene:</p>
        ${bookingTable(booking, apartment)}
        ${paymentBox(booking)}
-       <p style="font-size:13px;color:#6b7e82;margin-top:18px;">Har du spørsmål? Bare svar på denne e-posten.</p>`,
+       ${
+         guestBookingUrl(booking.accessToken)
+           ? `<p style="font-size:14px;line-height:1.6;color:#33474b;margin-top:18px;">På din egen bookingside kan du melde innsjekk, finne innsjekk-info og chatte med oss:</p>${button(guestBookingUrl(booking.accessToken) as string, "Åpne min booking")}`
+           : ""
+       }
+       <p style="font-size:13px;color:#6b7e82;margin-top:18px;">Har du spørsmål? Bare svar på denne e-posten, eller bruk chatten på bookingsiden.</p>`,
     ),
   });
 
@@ -168,7 +185,12 @@ export async function sendBookingStatusEmail(booking: Booking, apartment: Apartm
         `<p style="font-size:15px;line-height:1.6;color:#33474b;">
           Hei ${booking.guestName}, vi gleder oss til å ta imot deg!</p>
          ${bookingTable(booking, apartment)}
-         ${paymentBox(booking)}`,
+         ${paymentBox(booking)}
+         ${
+           guestBookingUrl(booking.accessToken)
+             ? button(guestBookingUrl(booking.accessToken) as string, "Min booking & innsjekk")
+             : ""
+         }`,
       ),
     });
   } else if (status === "cancelled") {
@@ -211,7 +233,7 @@ export async function sendInquiryEmails(inquiry: Inquiry, apartmentTitle?: strin
     ),
   });
 
-  const admin = adminEmail()
+  const adminInq = adminEmail()
     ? sendEmail({
         to: adminEmail() as string,
         subject: `Ny forespørsel: ${inquiry.name}${inquiry.durationMonths ? ` (${inquiry.durationMonths} mnd)` : ""}`,
@@ -229,5 +251,59 @@ export async function sendInquiryEmails(inquiry: Inquiry, apartmentTitle?: strin
       })
     : Promise.resolve({ ok: true });
 
-  await Promise.all([guest, admin]);
+  await Promise.all([guest, adminInq]);
+}
+
+// ── Innsjekk & chat ──────────────────────────────────────────────────────────
+
+/** Varsler utleier når en gjest melder innsjekk. */
+export async function sendCheckinRequestedEmail(booking: Booking, apartment: Apartment) {
+  if (!adminEmail()) return;
+  await sendEmail({
+    to: adminEmail() as string,
+    subject: `Innsjekk meldt: ${booking.guestName} – ${apartment.title}`,
+    replyTo: booking.email,
+    html: layout(
+      "Gjest har meldt innsjekk",
+      `<p style="font-size:15px;line-height:1.6;color:#33474b;">
+        ${booking.guestName} har meldt innsjekk for ${apartment.title}.</p>
+       ${bookingTable(booking, apartment)}
+       ${button(adminBookingUrl(booking.id), "Åpne booking & chat")}`,
+    ),
+  });
+}
+
+/** Varsler den andre parten om en ny chat-melding. */
+export async function sendNewMessageEmail(
+  booking: Booking,
+  apartment: Apartment,
+  sender: "guest" | "host",
+  text: string,
+) {
+  const quote = `<p style="margin-top:14px;padding:12px;background:#f6f3ee;border-radius:10px;font-size:14px;white-space:pre-line;">${text}</p>`;
+
+  if (sender === "guest") {
+    // Gjest skrev → varsle utleier.
+    if (!adminEmail()) return;
+    await sendEmail({
+      to: adminEmail() as string,
+      subject: `Ny melding fra ${booking.guestName} – ${apartment.title}`,
+      replyTo: booking.email,
+      html: layout("Ny melding fra gjest", quote + button(adminBookingUrl(booking.id), "Svar i chat")),
+    });
+  } else {
+    // Utleier skrev → varsle gjest.
+    const url = guestBookingUrl(booking.accessToken);
+    await sendEmail({
+      to: booking.email,
+      subject: `Ny melding fra ${business.name}`,
+      replyTo: adminEmail() ?? undefined,
+      html: layout(
+        "Du har fått en melding",
+        `<p style="font-size:15px;color:#33474b;">Hei ${booking.guestName}, du har en ny melding fra utleier:</p>` +
+          quote +
+          (url ? button(url, "Åpne chat") : ""),
+      ),
+    });
+  }
 }

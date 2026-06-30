@@ -133,6 +133,25 @@ opp. Sending er pakket i `try/catch`: en e-postfeil stopper aldri en booking.
 
 ---
 
+## Innsjekk & chat
+
+Hver booking får en **privat lenke** (`/min-booking/<token>`) – ingen innlogging.
+Lenken sendes i bookingbekreftelsen og vises på kvitteringssiden.
+
+På «Min booking» kan gjesten:
+- Se status og detaljer.
+- **Melde innsjekk** – da låses innsjekk-info opp (dørkode, WiFi, veibeskrivelse,
+  satt per leilighet i admin) og Jafar varsles på e-post. Info låses også
+  automatisk opp 2 dager før innsjekk.
+- **Chatte** med utleier. Meldinger oppdateres med polling (hvert 8. sek), og
+  begge parter får e-postvarsel ved nye meldinger.
+
+Jafar svarer fra **admin → Bookinger → (åpne en booking)**, der hele samtalen og
+innsjekk-status ligger. Uleste meldinger fra gjest vises med et merke i booking-
+lista. Innsjekk-info redigeres på selve leiligheten (felt «Innsjekk»).
+
+---
+
 ## Produksjon (Postgres)
 
 1. Endre `provider = "postgresql"` i `prisma/schema.prisma`.

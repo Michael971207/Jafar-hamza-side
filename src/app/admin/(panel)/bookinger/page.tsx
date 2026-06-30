@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatNok, formatDateNo } from "@/lib/format";
 import {
@@ -29,6 +30,14 @@ export default async function AdminBookings() {
     prisma.apartment.findMany({ where: { active: true }, select: { id: true, title: true }, orderBy: { title: "asc" } }),
   ]);
 
+  // Uleste meldinger fra gjest pr. booking (for indikator).
+  const unreadGroups = await prisma.message.groupBy({
+    by: ["bookingId"],
+    where: { sender: "guest", readByHost: false },
+    _count: { _all: true },
+  });
+  const unread = new Map(unreadGroups.map((g) => [g.bookingId, g._count._all]));
+
   return (
     <div className="space-y-8">
       <h1 className="font-display text-3xl font-semibold">Bookinger</h1>
@@ -53,7 +62,14 @@ export default async function AdminBookings() {
             {bookings.map((b) => (
               <tr key={b.id}>
                 <td className="px-4 py-3">
-                  <div className="font-medium">{b.guestName}</div>
+                  <Link href={`/admin/bookinger/${b.id}`} className="font-medium hover:underline">
+                    {b.guestName}
+                  </Link>
+                  {unread.get(b.id) ? (
+                    <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">
+                      {unread.get(b.id)} ny{unread.get(b.id) === 1 ? "" : "e"}
+                    </span>
+                  ) : null}
                   <div className="text-xs text-ink-muted">{b.email}{b.phone ? ` · ${b.phone}` : ""}</div>
                 </td>
                 <td className="px-4 py-3">{b.apartment.title}</td>
@@ -74,6 +90,9 @@ export default async function AdminBookings() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
+                    <Link href={`/admin/bookinger/${b.id}`} className="text-xs font-medium text-brand hover:underline">
+                      Åpne
+                    </Link>
                     {b.status !== "confirmed" && (
                       <form action={setBookingStatusAction}>
                         <input type="hidden" name="id" value={b.id} />

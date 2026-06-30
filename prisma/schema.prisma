@@ -50,6 +50,12 @@ model Apartment {
   minNights Int @default(1)
   maxNights Int @default(90)
 
+  // Innsjekk
+  checkInTime  String @default("15:00")
+  checkOutTime String @default("11:00")
+  // Info som vises til gjest ved innsjekk (dørkode, WiFi, veibeskrivelse, husregler).
+  checkInInfo  String @default("")
+
   active    Boolean @default(true)
   featured  Boolean @default(false)
   createdAt DateTime @default(now())
@@ -88,11 +94,36 @@ model Booking {
   // Referanse i ekstern kanal (f.eks. Airbnb reservasjons-ID)
   channelRef String?
 
+  // Privat token for gjestens "Min booking"-side (innsjekk + chat). Ingen innlogging.
+  accessToken String? @unique
+  // Når gjesten meldte innsjekk (null = ikke meldt ennå).
+  checkinRequestedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  messages Message[]
+
   @@index([apartmentId, checkIn, checkOut])
   @@index([status])
+}
+
+/// Melding i samtalen mellom gjest og utleier, knyttet til en booking.
+model Message {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  // guest | host
+  sender String
+  body   String
+
+  readByHost  Boolean @default(false)
+  readByGuest Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
 }
 
 /// Blokkering av datoer som IKKE er en booking hos oss:

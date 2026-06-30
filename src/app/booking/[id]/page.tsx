@@ -70,6 +70,19 @@ export default async function BookingConfirmation({ params }: { params: { id: st
           </ul>
         </div>
 
+        {booking.accessToken && (
+          <div className="mt-6 rounded-xl bg-sand-dark p-5 text-sm">
+            <h2 className="font-semibold">Din bookingside</h2>
+            <p className="mt-1 text-ink-soft">
+              Her kan du melde innsjekk, finne innsjekk-info og chatte direkte med oss.
+              Lenken er også sendt på e-post.
+            </p>
+            <Link href={`/min-booking/${booking.accessToken}`} className="btn-primary mt-3">
+              Åpne min booking
+            </Link>
+          </div>
+        )}
+
         <div className="mt-8 flex gap-3">
           <Link href="/leiligheter" className="btn-ghost">Se flere leiligheter</Link>
           <Link href="/" className="btn-primary">Til forsiden</Link>

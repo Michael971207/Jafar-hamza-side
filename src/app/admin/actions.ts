@@ -7,7 +7,7 @@ import { checkPassword, startSession, endSession } from "@/lib/auth";
 import { parseDateOnly } from "@/lib/dates";
 import { syncAll } from "@/lib/sync";
 import { closeDatesOnChannels } from "@/lib/channels";
-import { sendBookingStatusEmail } from "@/lib/email";
+import { sendBookingStatusEmail, sendNewMessageEmail } from "@/lib/email";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -88,6 +88,9 @@ export async function upsertApartmentAction(formData: FormData) {
     allowLongTerm: bool(formData, "allowLongTerm"),
     minNights: int(formData, "minNights", 1),
     maxNights: int(formData, "maxNights", 90),
+    checkInTime: str(formData, "checkInTime") || "15:00",
+    checkOutTime: str(formData, "checkOutTime") || "11:00",
+    checkInInfo: str(formData, "checkInInfo"),
     active: bool(formData, "active"),
     featured: bool(formData, "featured"),
   };
@@ -149,6 +152,27 @@ export async function setBookingStatusAction(formData: FormData) {
     console.error("E-postvarsling (status) feilet:", mailErr);
   }
   revalidatePath("/admin/bookinger");
+}
+
+/** Utleier sender en chat-melding til gjesten. */
+export async function sendHostMessageAction(bookingId: string, body: string) {
+  const text = body.trim();
+  if (!text) return;
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { apartment: true },
+  });
+  if (!booking) return;
+
+  await prisma.message.create({
+    data: { bookingId, sender: "host", body: text, readByHost: true },
+  });
+  try {
+    await sendNewMessageEmail(booking, booking.apartment, "host", text);
+  } catch (e) {
+    console.error("E-post (ny melding fra utleier) feilet:", e);
+  }
+  revalidatePath(`/admin/bookinger/${bookingId}`);
 }
 
 /** Manuell sperring av datoer (f.eks. eget bruk / vedlikehold). */

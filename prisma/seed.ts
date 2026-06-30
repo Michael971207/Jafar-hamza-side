@@ -53,6 +53,12 @@ async function main() {
       minNights: 2,
       maxNights: 120,
       featured: true,
+      checkInTime: "15:00",
+      checkOutTime: "11:00",
+      checkInInfo:
+        "Dørkode: 4821 (tast inn og trykk nøkkel-symbol).\n" +
+        "WiFi: Sentrum-Gjest / passord: velkommen2026\n" +
+        "Inngang fra baksiden, 2. etasje. Søppel i kjeller. Ta kontakt i chatten om noe er uklart!",
     },
   });
 
@@ -125,7 +131,7 @@ async function main() {
   });
 
   // Eksempel-booking (bekreftet) som blokkerer noen datoer.
-  await prisma.booking.create({
+  const demoBooking = await prisma.booking.create({
     data: {
       apartmentId: sentrum.id,
       guestName: "Ola Nordmann",
@@ -138,7 +144,16 @@ async function main() {
       totalPrice: 4 * 1190 + 600,
       status: "confirmed",
       source: "direct",
+      accessToken: "demo-booking-token-0123456789abcdef",
     },
+  });
+
+  // Eksempel-chat på demo-bookingen.
+  await prisma.message.create({
+    data: { bookingId: demoBooking.id, sender: "guest", body: "Hei! Er det mulig med tidlig innsjekk rundt kl. 13?", readByGuest: true },
+  });
+  await prisma.message.create({
+    data: { bookingId: demoBooking.id, sender: "host", body: "Hei Ola! Det skal gå fint, leiligheten er klar fra 13. Velkommen!", readByHost: true },
   });
 
   // Eksempel: importert opptatt-periode fra Airbnb (som om iCal-synk hadde kjørt).

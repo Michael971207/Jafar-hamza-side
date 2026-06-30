@@ -150,6 +150,30 @@ export function AdminApartmentForm({ apartment }: { apartment?: Apartment }) {
         </div>
       </section>
 
+      <section className="card space-y-4 p-6">
+        <h2 className="font-display text-lg font-semibold">Innsjekk</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label">Innsjekk fra (kl.)</label>
+            <input name="checkInTime" className="input" defaultValue={a?.checkInTime ?? "15:00"} placeholder="15:00" />
+          </div>
+          <div>
+            <label className="label">Utsjekk innen (kl.)</label>
+            <input name="checkOutTime" className="input" defaultValue={a?.checkOutTime ?? "11:00"} placeholder="11:00" />
+          </div>
+        </div>
+        <div>
+          <label className="label">Innsjekk-info (vises til gjest etter at de melder innsjekk)</label>
+          <textarea
+            name="checkInInfo"
+            rows={4}
+            className="input"
+            defaultValue={a?.checkInInfo ?? ""}
+            placeholder="Dørkode: 1234&#10;WiFi: Nettverk / passord&#10;Veibeskrivelse, parkering, husregler …"
+          />
+        </div>
+      </section>
+
       <section className="card space-y-3 p-6">
         <h2 className="font-display text-lg font-semibold">Bilder</h2>
         <label className="label">Én bilde-URL per linje (første blir hovedbilde)</label>

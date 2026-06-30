@@ -1,6 +1,12 @@
+import crypto from "crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { nightsBetween, toUtcDate } from "@/lib/dates";
+
+/** Privat, ugjettbar token til gjestens "Min booking"-side. */
+export function generateAccessToken(): string {
+  return crypto.randomBytes(24).toString("hex");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ANTI-DOBBELTBOOKING
@@ -149,6 +155,7 @@ export async function createBooking(input: CreateBookingInput) {
         source: input.source ?? "direct",
         channelRef: input.channelRef ?? null,
         status: input.status ?? "pending",
+        accessToken: generateAccessToken(),
       },
     });
   }, {
